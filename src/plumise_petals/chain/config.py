@@ -1,0 +1,128 @@
+"""Configuration management for Plumise Petals.
+
+Loads settings from environment variables and/or .env file using pydantic-settings.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Optional
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# Contract ABI paths (relative to project root)
+_CONTRACTS_DIR = Path(__file__).resolve().parent.parent.parent.parent / "contracts"
+
+
+class PlumiseConfig(BaseSettings):
+    """Plumise Petals configuration.
+
+    Values are loaded in priority order:
+    1. Explicit constructor arguments
+    2. Environment variables
+    3. .env file
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # -- Plumise Chain --
+    plumise_rpc_url: str = Field(
+        default="http://localhost:26902",
+        description="Plumise chain JSON-RPC endpoint",
+    )
+    plumise_chain_id: int = Field(
+        default=41956,
+        description="Plumise chain ID",
+    )
+    plumise_private_key: str = Field(
+        default="",
+        description="Hex-encoded private key for the agent wallet",
+    )
+
+    # -- Contract addresses (set after deployment) --
+    agent_registry_address: Optional[str] = Field(
+        default=None,
+        description="AgentRegistry contract address (deployed post-genesis)",
+    )
+    reward_pool_address: Optional[str] = Field(
+        default=None,
+        description="RewardPool contract address (deployed post-genesis)",
+    )
+
+    # -- Oracle --
+    oracle_api_url: str = Field(
+        default="http://localhost:3100",
+        description="Plumise Oracle API base URL",
+    )
+    report_interval: int = Field(
+        default=60,
+        ge=10,
+        description="Metrics report interval in seconds",
+    )
+
+    # -- Petals Server --
+    model_name: str = Field(
+        default="meta-llama/Llama-3.1-8B",
+        description="HuggingFace model identifier to serve",
+    )
+    num_blocks: int = Field(
+        default=4,
+        ge=1,
+        description="Number of transformer blocks (shards) to serve",
+    )
+    petals_host: str = Field(
+        default="0.0.0.0",
+        description="Petals server listen address",
+    )
+    petals_port: int = Field(
+        default=31330,
+        ge=1,
+        le=65535,
+        description="Petals server listen port",
+    )
+
+    # -- Reward claim --
+    claim_threshold_wei: int = Field(
+        default=10**18,  # 1 PLM
+        ge=0,
+        description="Minimum pending reward (in wei) to trigger auto-claim",
+    )
+
+    @field_validator("plumise_private_key")
+    @classmethod
+    def _normalize_private_key(cls, v: str) -> str:
+        if not v:
+            return v
+        v = v.strip()
+        if not v.startswith("0x"):
+            v = "0x" + v
+        return v
+
+    # -- ABI loaders --
+    @staticmethod
+    def load_abi(name: str) -> list:
+        """Load a contract ABI from the contracts/ directory.
+
+        Args:
+            name: Contract name without extension, e.g. ``"AgentRegistry"``.
+
+        Returns:
+            Parsed ABI as a list of dicts.
+        """
+        path = _CONTRACTS_DIR / f"{name}.json"
+        if not path.exists():
+            raise FileNotFoundError(f"ABI file not found: {path}")
+        with open(path) as f:
+            data = json.load(f)
+        # Support both raw ABI arrays and {abi: [...]} wrappers
+        if isinstance(data, list):
+            return data
+        return data.get("abi", data)

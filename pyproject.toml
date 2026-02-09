@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plumise-petals"
+version = "0.1.0"
+description = "Distributed LLM inference on Plumise chain - a Petals fork with blockchain integration"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Plumbug Studio"},
+]
+keywords = ["llm", "distributed", "inference", "blockchain", "petals", "plumise"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "petals>=2.3.0",
+    "web3>=6.0.0",
+    "eth-account>=0.10.0",
+    "aiohttp>=3.9.0",
+    "click>=8.0.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.scripts]
+plumise-petals = "plumise_petals.cli.run_server:main"
+
+[project.urls]
+Homepage = "https://github.com/mikusnuz/plumise-petals"
+Repository = "https://github.com/mikusnuz/plumise-petals"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
