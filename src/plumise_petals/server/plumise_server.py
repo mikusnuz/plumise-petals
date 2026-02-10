@@ -75,6 +75,10 @@ class PlumiseServer:
         3. Start the Oracle reporter
         4. Wait for shutdown signal
         """
+        # Install global asyncio exception handler
+        loop = asyncio.get_running_loop()
+        loop.set_exception_handler(self._asyncio_exception_handler)
+
         logger.info("=" * 60)
         logger.info("  Plumise Petals Server")
         logger.info("  Agent: %s", self.auth.address)
@@ -206,11 +210,38 @@ class PlumiseServer:
         summary = self.rewards.summary()
         logger.info("Reward summary: %s", summary)
 
+        # Clear private key from config memory (best effort)
+        try:
+            self.config.plumise_private_key = ""  # type: ignore[misc]
+        except Exception:
+            pass
+
         logger.info("Shutdown complete")
 
     def request_shutdown(self) -> None:
         """Request a graceful shutdown from any thread."""
         self._shutdown_event.set()
+
+    # ------------------------------------------------------------------
+    # Exception handling
+    # ------------------------------------------------------------------
+
+    def _asyncio_exception_handler(
+        self, loop: asyncio.AbstractEventLoop, context: dict
+    ) -> None:
+        """Handle uncaught asyncio exceptions to prevent silent process death."""
+        exception = context.get("exception")
+        message = context.get("message", "Unhandled asyncio exception")
+        if exception:
+            logger.error(
+                "Unhandled asyncio exception: %s - %s",
+                message,
+                exception,
+                exc_info=exception,
+            )
+        else:
+            logger.error("Unhandled asyncio error: %s", message)
+        # Don't crash the process - log and continue
 
     # ------------------------------------------------------------------
     # Signal handling

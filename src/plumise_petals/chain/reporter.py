@@ -129,10 +129,29 @@ class OracleReporter:
         body = {"payload": payload, "signature": signature}
 
         try:
-            timeout = aiohttp.ClientTimeout(total=15)
+            timeout = aiohttp.ClientTimeout(total=30)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(url, json=body) as resp:
                     if resp.status < 300:
+                        # Validate oracle response structure
+                        try:
+                            resp_data = await resp.json()
+                            if not isinstance(resp_data, dict):
+                                logger.warning(
+                                    "Oracle returned non-dict response: %s",
+                                    str(resp_data)[:200],
+                                )
+                                return False
+                            if resp_data.get("status") == "error":
+                                logger.warning(
+                                    "Oracle rejected report: %s",
+                                    resp_data.get("message", "unknown error")[:200],
+                                )
+                                return False
+                        except (json.JSONDecodeError, aiohttp.ContentTypeError):
+                            # Accept non-JSON 2xx responses (some oracles return plain text)
+                            pass
+
                         logger.debug(
                             "Report sent successfully: tokens=%d uptime=%ds",
                             payload["processed_tokens"],

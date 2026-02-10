@@ -41,7 +41,10 @@ class PlumiseAuth:
 
     def __init__(self, config: PlumiseConfig) -> None:
         self.config = config
-        self.w3 = Web3(Web3.HTTPProvider(config.plumise_rpc_url))
+        self.w3 = Web3(Web3.HTTPProvider(
+            config.plumise_rpc_url,
+            request_kwargs={"timeout": 30},
+        ))
         self.account = Account.from_key(config.plumise_private_key)
         self.address: str = self.account.address
         self.chain_id: int = config.plumise_chain_id
