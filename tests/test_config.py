@@ -22,8 +22,8 @@ class TestPlumiseConfig:
         assert config.plumise_chain_id == 41956
         assert config.oracle_api_url == "http://localhost:3100"
         assert config.report_interval == 60
-        assert config.model_name == "meta-llama/Llama-3.1-8B"
-        assert config.num_blocks == 4
+        assert config.model_name == "bigscience/bloom-560m"
+        assert config.num_blocks == 2
         assert config.petals_host == "0.0.0.0"
         assert config.petals_port == 31330
         assert config.agent_registry_address is None

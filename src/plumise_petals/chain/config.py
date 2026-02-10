@@ -70,11 +70,11 @@ class PlumiseConfig(BaseSettings):
 
     # -- Petals Server --
     model_name: str = Field(
-        default="meta-llama/Llama-3.1-8B",
+        default="bigscience/bloom-560m",
         description="HuggingFace model identifier to serve",
     )
     num_blocks: int = Field(
-        default=4,
+        default=2,
         ge=1,
         description="Number of transformer blocks (shards) to serve",
     )

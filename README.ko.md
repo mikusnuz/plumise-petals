@@ -35,12 +35,26 @@ Plumise 체인 기반 분산 LLM 추론 -- [Petals](https://github.com/bigscienc
 - **보상 추적** -- RewardPool 컨트랙트에서 대기 중인 보상을 모니터링하고, 임계값에 도달하면 자동으로 클레임합니다.
 - **CLI 인터페이스** -- 서버 시작 및 상태 확인을 위한 간단한 커맨드라인 인터페이스를 제공합니다.
 
-## 요구사항
+## 최소 요구사항
 
-- Python 3.10+
-- Plumise 체인 노드 (또는 RPC 엔드포인트)
-- AgentRegistry에 등록된 이더리움 호환 프라이빗 키
-- 트랜스포머 모델 블록 서빙을 위한 충분한 GPU/CPU
+- **RAM**: 2GB 이상 (경량 모델 사용 시 ~300MB)
+- **디스크**: 1GB 여유 공간
+- **Python**: 3.10+
+- **네트워크**: Plumise 체인 RPC 엔드포인트
+- **지갑**: AgentRegistry에 등록된 이더리움 호환 프라이빗 키
+
+> **GPU 불필요!** Petals는 CPU 추론을 지원합니다. Apple Silicon Mac, 저사양 PC에서도 참여하여 PLM 보상을 받을 수 있습니다.
+
+### 모델 티어
+
+| 티어 | 모델 | 2블록 기준 RAM | 전체 모델 크기 | 적합 환경 |
+|------|------|----------------|----------------|-----------|
+| **Lite** | `bigscience/bloom-560m` | ~300MB | ~1.1GB | 저사양 PC, 백그라운드 실행 |
+| **Standard** | `bigscience/bloom-7b1` | ~1.5GB | ~14GB | RAM 16GB PC |
+| **Pro** | `meta-llama/Llama-3.1-8B` | ~2GB | ~16GB (FP16) | RAM 32GB+ / Apple Silicon |
+| **Ultra** | `meta-llama/Llama-3.1-70B` | ~10GB | ~140GB | GPU 서버 |
+
+기본 모델은 **bloom-560m** (Lite 티어)입니다 -- 최소한의 하드웨어로 누구나 PLM 보상을 시작할 수 있습니다.
 
 ## 설치
 
@@ -72,8 +86,8 @@ cp .env.example .env
 | `PLUMISE_PRIVATE_KEY` | -- | 에이전트 지갑 프라이빗 키 (hex) |
 | `ORACLE_API_URL` | `http://localhost:3100` | Oracle API 기본 URL |
 | `REPORT_INTERVAL` | `60` | 메트릭 보고 주기 (초) |
-| `MODEL_NAME` | `meta-llama/Llama-3.1-8B` | 서빙할 HuggingFace 모델 |
-| `NUM_BLOCKS` | `4` | 서빙할 트랜스포머 블록 수 |
+| `MODEL_NAME` | `bigscience/bloom-560m` | 서빙할 HuggingFace 모델 (모델 티어 참조) |
+| `NUM_BLOCKS` | `2` | 서빙할 트랜스포머 블록 수 (많을수록 보상 증가) |
 | `PETALS_HOST` | `0.0.0.0` | 서버 리슨 주소 |
 | `PETALS_PORT` | `31330` | 서버 리슨 포트 |
 
@@ -87,10 +101,15 @@ plumise-petals serve
 
 # 명시적 옵션 사용
 plumise-petals serve \
-    --model meta-llama/Llama-3.1-8B \
+    --model bigscience/bloom-560m \
     --private-key 0xYOUR_PRIVATE_KEY \
     --rpc-url http://localhost:26902 \
     --oracle-url http://localhost:3100 \
+    --num-blocks 2
+
+# 더 무거운 모델로 더 많은 보상 받기
+plumise-petals serve \
+    --model meta-llama/Llama-3.1-8B \
     --num-blocks 4
 
 # 상세 로깅

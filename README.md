@@ -35,12 +35,26 @@ Nodes serve transformer model shards and together form a distributed inference n
 - **Reward Tracking** -- Monitor pending rewards from the RewardPool contract and auto-claim when threshold is met.
 - **CLI Interface** -- Simple command-line interface for starting the server and checking status.
 
-## Requirements
+## Minimum Requirements
 
-- Python 3.10+
-- A Plumise chain node (or RPC endpoint)
-- An Ethereum-compatible private key registered in AgentRegistry
-- Sufficient GPU/CPU to serve transformer model blocks
+- **RAM**: 2GB+ available (as low as ~300MB with lightweight models)
+- **Disk**: 1GB free space
+- **Python**: 3.10+
+- **Network**: Plumise chain RPC endpoint
+- **Wallet**: Ethereum-compatible private key registered in AgentRegistry
+
+> **No GPU required!** Petals supports CPU inference. Apple Silicon Macs and even low-end PCs can participate and earn PLM rewards.
+
+### Model Tiers
+
+| Tier | Model | RAM per 2 blocks | Total Model Size | Best For |
+|------|-------|-------------------|------------------|----------|
+| **Lite** | `bigscience/bloom-560m` | ~300MB | ~1.1GB | Low-end PCs, background running |
+| **Standard** | `bigscience/bloom-7b1` | ~1.5GB | ~14GB | 16GB RAM PCs |
+| **Pro** | `meta-llama/Llama-3.1-8B` | ~2GB | ~16GB (FP16) | 32GB+ RAM / Apple Silicon |
+| **Ultra** | `meta-llama/Llama-3.1-70B` | ~10GB | ~140GB | GPU servers |
+
+The default model is **bloom-560m** (Lite tier) -- anyone can start earning PLM with minimal hardware.
 
 ## Installation
 
@@ -72,8 +86,8 @@ cp .env.example .env
 | `PLUMISE_PRIVATE_KEY` | -- | Agent wallet private key (hex) |
 | `ORACLE_API_URL` | `http://localhost:3100` | Oracle API base URL |
 | `REPORT_INTERVAL` | `60` | Metrics report interval (seconds) |
-| `MODEL_NAME` | `meta-llama/Llama-3.1-8B` | HuggingFace model to serve |
-| `NUM_BLOCKS` | `4` | Transformer blocks to serve |
+| `MODEL_NAME` | `bigscience/bloom-560m` | HuggingFace model to serve (see Model Tiers) |
+| `NUM_BLOCKS` | `2` | Transformer blocks to serve (more = more rewards) |
 | `PETALS_HOST` | `0.0.0.0` | Server listen address |
 | `PETALS_PORT` | `31330` | Server listen port |
 
@@ -87,10 +101,15 @@ plumise-petals serve
 
 # With explicit options
 plumise-petals serve \
-    --model meta-llama/Llama-3.1-8B \
+    --model bigscience/bloom-560m \
     --private-key 0xYOUR_PRIVATE_KEY \
     --rpc-url http://localhost:26902 \
     --oracle-url http://localhost:3100 \
+    --num-blocks 2
+
+# Serve a heavier model with more blocks (higher rewards)
+plumise-petals serve \
+    --model meta-llama/Llama-3.1-8B \
     --num-blocks 4
 
 # Verbose logging

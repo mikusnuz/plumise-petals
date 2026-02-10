@@ -3,7 +3,7 @@
 Usage::
 
     plumise-petals serve \\
-        --model meta-llama/Llama-3.1-8B \\
+        --model bigscience/bloom-560m \\
         --private-key 0x... \\
         --rpc-url http://localhost:26902
 
@@ -47,7 +47,7 @@ def cli() -> None:
     "--model",
     "model_name",
     default=None,
-    help="HuggingFace model to serve (e.g. meta-llama/Llama-3.1-8B).",
+    help="HuggingFace model to serve (e.g. bigscience/bloom-560m, meta-llama/Llama-3.1-8B).",
 )
 @click.option(
     "--private-key",
