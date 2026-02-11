@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  plumise-petals:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: plumise-petals
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    volumes:
+      - ./model-cache:/root/.cache/huggingface
+    environment:
+      - HF_HOME=/root/.cache/huggingface
+      - PYTHONUNBUFFERED=1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

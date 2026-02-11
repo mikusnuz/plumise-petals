@@ -93,7 +93,28 @@ cp .env.example .env
 
 ## 사용법
 
-### 서버 시작
+### Docker로 빠르게 시작하기
+
+```bash
+# 환경 변수 파일 복사
+cp .env.example .env
+
+# 설정 편집 (프라이빗 키 설정)
+nano .env
+
+# 빌드 및 시작
+docker compose up -d
+
+# 로그 확인
+docker compose logs -f
+
+# 상태 확인
+curl http://localhost:31330/health
+```
+
+자세한 Docker 배포 가이드는 [DEPLOYMENT.md](DEPLOYMENT.md)를 참조하세요.
+
+### 수동 설치
 
 ```bash
 # 환경 변수 / .env 사용

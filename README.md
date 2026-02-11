@@ -93,7 +93,28 @@ cp .env.example .env
 
 ## Usage
 
-### Start the Server
+### Quick Start with Docker
+
+```bash
+# Copy environment file
+cp .env.example .env
+
+# Edit configuration (set your private key)
+nano .env
+
+# Build and start
+docker compose up -d
+
+# Check logs
+docker compose logs -f
+
+# Check status
+curl http://localhost:31330/health
+```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed Docker deployment guide.
+
+### Manual Installation
 
 ```bash
 # Using environment variables / .env

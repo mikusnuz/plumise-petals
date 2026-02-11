@@ -24,6 +24,7 @@ ENV/
 
 # Environment
 .env
+.env.server-*
 
 # Distribution
 *.tar.gz
@@ -38,3 +39,7 @@ htmlcov/
 # Misc
 .DS_Store
 Thumbs.db
+
+# Docker
+model-cache/
+*.log
