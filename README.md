@@ -21,17 +21,19 @@ That's it. Your node will start serving model shards and earning PLM.
 ## How You Earn PLM
 
 ```
- You run a node        Metrics reported         Score calculated       Rewards distributed
+ You run a node      Proof + Metrics sent       Score calculated       Rewards distributed
 +--------------+      +---------------+        +----------------+     +------------------+
 | Petals Node  | ---> | Oracle        | -----> | Scoring Engine | --> | RewardPool       |
-| (inference)  |      | (collects)    |        | (contribution) |     | (on-chain PLM)   |
+| (inference + |      | (collects +   |        | (contribution) |     | (on-chain PLM)   |
+|  proof gen)  |      |  verifies)    |        |                |     |                  |
 +--------------+      +---------------+        +----------------+     +------------------+
 ```
 
 1. **Serve AI inference** -- Your node handles a portion of a large language model
-2. **Report metrics** -- Token throughput, latency, and uptime are signed and sent to the Oracle
-3. **Get scored** -- The Oracle calculates your contribution relative to other nodes
-4. **Receive PLM** -- Rewards from the RewardPool contract are distributed each epoch
+2. **Generate proof** -- After each inference, a proof hash is generated and sent to the Oracle
+3. **Report metrics** -- Token throughput, latency, and uptime are signed and sent to the Oracle
+4. **Get scored** -- The Oracle calculates your contribution relative to other nodes (enriched with proof data)
+5. **Receive PLM** -- Rewards from the RewardPool contract are distributed each epoch
 
 ## Architecture
 
@@ -65,6 +67,38 @@ For the full ecosystem architecture (including Inference API Gateway and Oracle 
 - **Oracle Reporting** -- Signed metrics reports sent periodically to the Plumise Oracle API (every 60 seconds).
 - **Reward Tracking** -- Monitor pending rewards from the RewardPool contract and auto-claim when threshold is met.
 - **CLI Interface** -- Simple command-line interface for starting the server and checking status.
+
+## Inference Proof Generation
+
+After each inference request, the node generates a cryptographic proof to attest that real work was performed. This proof is the foundation for verifiable AI inference on Plumise.
+
+**How it works:**
+
+1. Node completes an inference request (text generation, chat completion, etc.)
+2. A proof hash is computed: `keccak256(modelHash || inputHash || outputHash || agentAddress)`
+3. The proof is signed with the agent's private key and sent to the Oracle alongside metrics
+4. The Oracle stores the proof and uses it to enrich contribution scoring
+5. Optionally, proofs can be verified on-chain via precompile `0x20` (verifyInference)
+
+**On-chain verification** is disabled by default to save gas. Enable it by setting `VERIFY_ON_CHAIN=true` in your `.env`. When enabled, the node calls precompile `0x20` after each inference to record the proof on-chain, providing the strongest guarantee of work.
+
+```
+Inference completed
+       |
+       v
++------------------+
+| Generate proof   |
+| keccak256(model + |
+| input + output + |
+| agent)           |
++--------+---------+
+         |
+    +----+----+
+    |         |
+    v         v (if VERIFY_ON_CHAIN=true)
+ Oracle    Precompile 0x20
+ (off-chain)  (on-chain)
+```
 
 ## Requirements
 
@@ -109,6 +143,8 @@ cp .env.example .env
 | `PETALS_HOST` | `0.0.0.0` | Server listen address |
 | `PETALS_PORT` | `31330` | Server listen port |
 | `CLAIM_THRESHOLD_WEI` | `1000000000000000000` | Auto-claim threshold (1 PLM) |
+| `VERIFY_ON_CHAIN` | `false` | Enable on-chain proof verification via precompile 0x20 |
+| `PROOF_SUBMIT_INTERVAL` | `60` | Proof batch submission interval to Oracle (seconds) |
 
 ## Usage
 
@@ -193,6 +229,7 @@ plumise-petals/
 │   ├── chain/            # Plumise chain integration
 │   │   ├── auth.py       # Agent authentication & registration
 │   │   ├── config.py     # Configuration management
+│   │   ├── proof.py      # Inference proof generation & submission
 │   │   ├── reporter.py   # Oracle metrics reporter
 │   │   └── rewards.py    # Reward tracking & claiming
 │   ├── server/           # Petals server integration
@@ -211,6 +248,11 @@ plumise-petals/
 ## Smart Contracts
 
 The system uses **precompiled contracts** for agent lifecycle management:
+
+### Precompile 0x20 (Inference Verification)
+- Called after each inference when `VERIFY_ON_CHAIN=true`
+- Input: proof hash (32B) + model hash (32B) + input hash (32B) + output hash (32B)
+- Records the inference proof on-chain for verifiable AI computation
 
 ### Precompile 0x21 (Agent Registration)
 - Called automatically on first start

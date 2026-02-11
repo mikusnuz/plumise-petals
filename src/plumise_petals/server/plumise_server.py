@@ -18,6 +18,7 @@ from typing import Optional
 from plumise_petals.chain.agent import ChainAgent
 from plumise_petals.chain.auth import PlumiseAuth
 from plumise_petals.chain.config import PlumiseConfig
+from plumise_petals.chain.proof import InferenceProofGenerator, ProofData
 from plumise_petals.chain.reporter import OracleReporter
 from plumise_petals.chain.rewards import RewardTracker
 from plumise_petals.server.metrics import MetricsCollector
@@ -60,6 +61,12 @@ class PlumiseServer:
             account=self.auth.account,
         )
 
+        # Proof generation
+        self.proof_generator = InferenceProofGenerator(
+            model_name=config.model_name,
+            agent_address=self.auth.address,
+        )
+
         # Metrics
         self.metrics = MetricsCollector()
 
@@ -92,6 +99,7 @@ class PlumiseServer:
         logger.info("  Blocks: %d", self.config.num_blocks)
         logger.info("  Chain: %s (ID %d)", self.config.plumise_rpc_url, self.config.plumise_chain_id)
         logger.info("  Oracle: %s", self.config.oracle_api_url)
+        logger.info("  On-chain verify: %s", "ON" if self.config.verify_on_chain else "OFF")
         logger.info("=" * 60)
 
         # Step 1: Chain checks
@@ -257,6 +265,84 @@ class PlumiseServer:
                 break
             except Exception:
                 logger.exception("Error in reward check loop")
+
+    # ------------------------------------------------------------------
+    # Inference proof integration
+    # ------------------------------------------------------------------
+
+    def record_inference(
+        self,
+        input_data: str | bytes,
+        output_data: str | bytes,
+        token_count: int,
+        latency_ms: float,
+    ) -> Optional[ProofData]:
+        """Record an inference and generate a proof.
+
+        This is the main entry point called from the inference handler.
+        It records metrics, generates a proof, and buffers it for the
+        next Oracle report. If ``verify_on_chain`` is enabled, the proof
+        is also queued for on-chain verification.
+
+        Args:
+            input_data: Raw input (prompt text or bytes).
+            output_data: Raw output (generated text or bytes).
+            token_count: Number of tokens generated.
+            latency_ms: End-to-end latency in milliseconds.
+
+        Returns:
+            The generated ``ProofData``, or ``None`` on error.
+        """
+        # 1. Record metrics (always)
+        self.metrics.record_inference(token_count, latency_ms)
+
+        # 2. Generate proof
+        try:
+            proof = self.proof_generator.generate_proof(
+                input_data=input_data,
+                output_data=output_data,
+                token_count=token_count,
+            )
+        except Exception:
+            logger.exception("Failed to generate inference proof")
+            return None
+
+        # 3. Buffer proof for Oracle reporting (always)
+        self.metrics.record_proof(proof)
+
+        # 4. Queue on-chain verification (if enabled)
+        if self.config.verify_on_chain:
+            asyncio.get_event_loop().call_soon_threadsafe(
+                self._schedule_on_chain_verify, proof
+            )
+
+        return proof
+
+    def _schedule_on_chain_verify(self, proof: ProofData) -> None:
+        """Schedule on-chain verification in the event loop."""
+        asyncio.ensure_future(self._verify_on_chain(proof))
+
+    async def _verify_on_chain(self, proof: ProofData) -> None:
+        """Run on-chain verification in a thread pool."""
+        try:
+            loop = asyncio.get_event_loop()
+            tx_hash = await loop.run_in_executor(
+                None,
+                self.agent.verify_inference,
+                proof,
+            )
+            if tx_hash:
+                logger.info(
+                    "On-chain verification complete: tx=%s proofHash=%s",
+                    tx_hash,
+                    "0x" + proof.proof_hash.hex()[:16] + "...",
+                )
+        except Exception:
+            logger.exception("On-chain verification error")
+
+    # ------------------------------------------------------------------
+    # Shutdown
+    # ------------------------------------------------------------------
 
     async def _shutdown(self) -> None:
         """Graceful shutdown: final report and cleanup."""

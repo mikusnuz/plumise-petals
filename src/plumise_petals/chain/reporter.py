@@ -91,7 +91,8 @@ class OracleReporter:
                     break
 
                 snapshot = metrics_collector.get_snapshot()
-                success = await self._send_report(snapshot)
+                proofs = metrics_collector.drain_proofs()
+                success = await self._send_report(snapshot, proofs=proofs)
 
                 if success:
                     self._consecutive_failures = 0
@@ -109,12 +110,20 @@ class OracleReporter:
                 logger.exception("Unexpected error in report loop")
                 self._consecutive_failures += 1
 
-    async def _send_report(self, metrics: object) -> bool:
+    async def _send_report(
+        self,
+        metrics: object,
+        proofs: list | None = None,
+    ) -> bool:
         """Build, sign and POST a metrics report.
+
+        Args:
+            metrics: An ``InferenceMetrics`` snapshot.
+            proofs: Optional list of ``ProofData`` instances to include.
 
         Returns ``True`` on success, ``False`` on any failure.
         """
-        payload = {
+        payload: dict = {
             "agent": self.auth.address,
             "processed_tokens": metrics.total_tokens_processed,
             "avg_latency_ms": round(metrics.avg_latency_ms, 2),
@@ -122,6 +131,10 @@ class OracleReporter:
             "tasks_completed": metrics.total_requests,
             "timestamp": int(time.time()),
         }
+
+        # Attach inference proofs if available
+        if proofs:
+            payload["proofs"] = [p.to_dict() for p in proofs]
 
         signature = self.auth.sign_payload(payload)
 
@@ -175,7 +188,8 @@ class OracleReporter:
         """Send one last report on shutdown."""
         try:
             snapshot = metrics_collector.get_snapshot()
-            await self._send_report(snapshot)
+            proofs = metrics_collector.drain_proofs()
+            await self._send_report(snapshot, proofs=proofs)
             logger.info("Final report sent")
         except Exception:
             logger.exception("Failed to send final report")

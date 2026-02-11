@@ -89,6 +89,12 @@ class PlumiseConfig(BaseSettings):
         description="Petals server listen port",
     )
 
+    # -- Inference proof --
+    verify_on_chain: bool = Field(
+        default=False,
+        description="Enable on-chain proof verification via precompile 0x20 (default OFF)",
+    )
+
     # -- Reward claim --
     claim_threshold_wei: int = Field(
         default=10**18,  # 1 PLM

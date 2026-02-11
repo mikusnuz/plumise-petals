@@ -10,6 +10,10 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from plumise_petals.chain.proof import ProofData
 
 
 @dataclass
@@ -67,9 +71,13 @@ class MetricsCollector:
     async reporter loop. All mutations are guarded by a lock.
     """
 
+    # Maximum number of proofs to buffer between report cycles.
+    _MAX_PROOF_BUFFER: int = 1000
+
     def __init__(self) -> None:
         self._metrics = InferenceMetrics(start_time=time.time())
         self._lock = threading.Lock()
+        self._proof_buffer: list[ProofData] = []
 
     def record_inference(self, tokens: int, latency_ms: float) -> None:
         """Record a single inference request.
@@ -82,6 +90,33 @@ class MetricsCollector:
             self._metrics.total_tokens_processed += tokens
             self._metrics.total_requests += 1
             self._metrics.total_latency_ms += latency_ms
+
+    def record_proof(self, proof: ProofData) -> None:
+        """Buffer a proof for the next Oracle report.
+
+        Old proofs are discarded when the buffer is full to prevent
+        unbounded memory growth.
+
+        Args:
+            proof: Proof data from ``InferenceProofGenerator``.
+        """
+        with self._lock:
+            if len(self._proof_buffer) >= self._MAX_PROOF_BUFFER:
+                self._proof_buffer.pop(0)
+            self._proof_buffer.append(proof)
+
+    def drain_proofs(self) -> list[ProofData]:
+        """Return and clear all buffered proofs.
+
+        This is called by the reporter when building the payload.
+
+        Returns:
+            List of proof data accumulated since the last drain.
+        """
+        with self._lock:
+            proofs = list(self._proof_buffer)
+            self._proof_buffer.clear()
+            return proofs
 
     def get_snapshot(self) -> InferenceMetrics:
         """Return an immutable snapshot of the current metrics.

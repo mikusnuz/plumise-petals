@@ -1,10 +1,11 @@
 """On-chain agent lifecycle management via precompiled contracts.
 
-Plumise chain provides two precompiled contracts for agent coordination:
+Plumise chain provides three precompiled contracts for agent coordination:
+- 0x20: Verify inference proof
 - 0x21: Agent registration
 - 0x22: Heartbeat ping
 
-This module encapsulates the registration and heartbeat logic.
+This module encapsulates the registration, heartbeat, and verification logic.
 """
 
 from __future__ import annotations
@@ -17,10 +18,12 @@ from web3 import Web3
 
 if TYPE_CHECKING:
     from plumise_petals.chain.config import PlumiseConfig
+    from plumise_petals.chain.proof import ProofData
 
 logger = logging.getLogger(__name__)
 
 # Precompiled contract addresses
+PRECOMPILE_VERIFY_INFERENCE = "0x0000000000000000000000000000000000000020"
 PRECOMPILE_AGENT_REGISTER = "0x0000000000000000000000000000000000000021"
 PRECOMPILE_AGENT_HEARTBEAT = "0x0000000000000000000000000000000000000022"
 
@@ -178,6 +181,61 @@ class ChainAgent:
         except Exception as exc:
             logger.warning("Heartbeat transaction failed: %s", exc)
             return False
+
+    # ------------------------------------------------------------------
+    # Inference Verification (precompile 0x20)
+    # ------------------------------------------------------------------
+
+    def verify_inference(self, proof: ProofData) -> Optional[str]:
+        """Submit an inference proof to the verifyInference precompile (0x20).
+
+        This is an optional on-chain verification step. The precompile
+        expects 160 bytes of ABI-encoded proof data.
+
+        Args:
+            proof: ``ProofData`` instance from ``InferenceProofGenerator``.
+
+        Returns:
+            Transaction hash hex string on success, or ``None`` on failure.
+        """
+        try:
+            input_data = proof.encode_precompile_input()
+
+            nonce = self.w3.eth.get_transaction_count(self.address)
+            gas_price = self.w3.eth.gas_price
+
+            tx = {
+                "from": self.address,
+                "to": Web3.to_checksum_address(PRECOMPILE_VERIFY_INFERENCE),
+                "value": 0,
+                "gas": 200_000,
+                "gasPrice": gas_price,
+                "nonce": nonce,
+                "data": "0x" + input_data.hex(),
+                "chainId": self.config.plumise_chain_id,
+            }
+
+            signed = self.account.sign_transaction(tx)
+            tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
+
+            logger.info(
+                "verifyInference tx sent: %s (tokens=%d)",
+                tx_hash.hex(),
+                proof.token_count,
+            )
+
+            receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=30)
+
+            if receipt["status"] == 1:
+                logger.info("verifyInference successful: %s", tx_hash.hex())
+                return tx_hash.hex()
+            else:
+                logger.warning("verifyInference failed (status=0): %s", tx_hash.hex())
+                return None
+
+        except Exception as exc:
+            logger.error("Failed to verify inference on-chain: %s", exc)
+            return None
 
     # ------------------------------------------------------------------
     # Utility
