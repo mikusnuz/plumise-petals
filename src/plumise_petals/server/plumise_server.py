@@ -212,6 +212,17 @@ class PlumiseServer:
                     self.config.petals_dht_prefix,
                     initial_peers or "(bootstrap)",
                 )
+                # Build extra kwargs for DHT
+                dht_kwargs = {}
+                if self.config.petals_announce_ip:
+                    # Listen on all interfaces and announce the specified IP
+                    dht_kwargs["host_maddrs"] = [
+                        f"/ip4/0.0.0.0/tcp/{self.config.petals_port}",
+                    ]
+                    dht_kwargs["announce_maddrs"] = [
+                        f"/ip4/{self.config.petals_announce_ip}/tcp/{self.config.petals_port}",
+                    ]
+
                 server = PetalsServer(
                     initial_peers=initial_peers,
                     dht_prefix=self.config.petals_dht_prefix,
@@ -219,6 +230,7 @@ class PlumiseServer:
                     throughput=self.config.petals_throughput,
                     num_blocks=self.config.num_blocks,
                     skip_reachability_check=True,
+                    **dht_kwargs,
                 )
                 server.run()
             except ImportError:

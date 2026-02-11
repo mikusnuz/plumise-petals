@@ -99,6 +99,10 @@ class PlumiseConfig(BaseSettings):
         default="auto",
         description="Server throughput setting (auto or float)",
     )
+    petals_announce_ip: str = Field(
+        default="",
+        description="Public IP to announce in DHT (empty = auto-detect)",
+    )
 
     # -- Inference proof --
     verify_on_chain: bool = Field(
