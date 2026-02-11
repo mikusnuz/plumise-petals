@@ -17,17 +17,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
         web3 eth-account aiohttp click python-dotenv pydantic pydantic-settings && \
     pip install --no-cache-dir --no-deps petals && \
     pip install --no-cache-dir --no-deps -e . && \
-    python3 -c "
-import hivemind, inspect, pathlib
-init = pathlib.Path(inspect.getfile(hivemind))
-txt = init.read_text()
-if 'PeerID' not in txt:
-    txt += '\nfrom hivemind.p2p import PeerID\n'
-    init.write_text(txt)
-    print('Patched hivemind __init__.py: added PeerID export')
-else:
-    print('PeerID already in hivemind __init__.py')
-"
+    python3 -c "import hivemind,inspect,pathlib;p=pathlib.Path(inspect.getfile(hivemind));t=p.read_text();exec('if \"PeerID\" not in t:\n p.write_text(t+chr(10)+\"from hivemind.p2p import PeerID\"+chr(10))\n print(\"Patched hivemind: added PeerID\")\nelse:\n print(\"PeerID already present\")')"
 
 FROM python:3.10-slim
 
