@@ -11,7 +11,7 @@ COPY requirements.txt pyproject.toml setup.py ./
 COPY src/ ./src/
 COPY contracts/ ./contracts/
 
-RUN pip install --no-cache-dir --upgrade pip && \
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir \
         torch>=1.12 \
         "transformers>=4.32.0,<4.35.0" \
