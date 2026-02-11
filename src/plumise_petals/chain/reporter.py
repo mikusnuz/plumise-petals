@@ -123,23 +123,32 @@ class OracleReporter:
 
         Returns ``True`` on success, ``False`` on any failure.
         """
-        payload: dict = {
+        ts = int(time.time())
+
+        # Sign only the fields that the Oracle verifies
+        sign_data = {
+            "agent": self.auth.address,
+            "processed_tokens": metrics.total_tokens_processed,
+            "timestamp": ts,
+        }
+        signature = self.auth.sign_payload(sign_data)
+
+        # Build flat body matching Oracle's ReportMetricsDto
+        body: dict = {
             "agent": self.auth.address,
             "processed_tokens": metrics.total_tokens_processed,
             "avg_latency_ms": round(metrics.avg_latency_ms, 2),
             "uptime_seconds": metrics.uptime_seconds,
             "tasks_completed": metrics.total_requests,
-            "timestamp": int(time.time()),
+            "timestamp": ts,
+            "signature": signature,
         }
 
         # Attach inference proofs if available
         if proofs:
-            payload["proofs"] = [p.to_dict() for p in proofs]
+            body["proofs"] = [p.to_dict() for p in proofs]
 
-        signature = self.auth.sign_payload(payload)
-
-        url = f"{self.oracle_url}/api/v1/report"
-        body = {"payload": payload, "signature": signature}
+        url = f"{self.oracle_url}/api/v1/metrics/report"
 
         try:
             timeout = aiohttp.ClientTimeout(total=30)
@@ -167,8 +176,8 @@ class OracleReporter:
 
                         logger.debug(
                             "Report sent successfully: tokens=%d uptime=%ds",
-                            payload["processed_tokens"],
-                            payload["uptime_seconds"],
+                            body["processed_tokens"],
+                            body["uptime_seconds"],
                         )
                         return True
                     else:
