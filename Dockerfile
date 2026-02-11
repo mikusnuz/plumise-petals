@@ -11,13 +11,13 @@ COPY requirements.txt pyproject.toml setup.py ./
 COPY src/ ./src/
 COPY contracts/ ./contracts/
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir torch transformers hivemind accelerate huggingface-hub \
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir --no-build-isolation hivemind==1.1.10.post2 && \
+    pip install --no-cache-dir torch transformers accelerate huggingface-hub \
         safetensors tokenizers sentencepiece bitsandbytes \
         web3 eth-account aiohttp click python-dotenv pydantic pydantic-settings && \
     pip install --no-cache-dir --no-deps petals && \
-    pip install --no-cache-dir --no-deps -e . && \
-    python3 -c "import hivemind,inspect,pathlib;p=pathlib.Path(inspect.getfile(hivemind));t=p.read_text();exec('if \"PeerID\" not in t:\n p.write_text(t+chr(10)+\"from hivemind.p2p import PeerID\"+chr(10))\n print(\"Patched hivemind: added PeerID\")\nelse:\n print(\"PeerID already present\")')"
+    pip install --no-cache-dir --no-deps -e .
 
 FROM python:3.10-slim
 
