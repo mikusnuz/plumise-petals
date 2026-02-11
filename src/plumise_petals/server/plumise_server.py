@@ -197,7 +197,7 @@ class PlumiseServer:
         """
         def _run_petals() -> None:
             try:
-                from petals import Server as PetalsServer  # type: ignore
+                from petals.server.server import Server as PetalsServer  # type: ignore
 
                 logger.info(
                     "Starting Petals server: model=%s blocks=%d host=%s port=%d",

@@ -12,7 +12,7 @@ COPY src/ ./src/
 COPY contracts/ ./contracts/
 
 RUN pip install --no-cache-dir --upgrade pip wheel && \
-    printf "torch>=2.1,<2.2\npydantic>=1.10,<2\ntransformers>=4.32,<4.35\nhuggingface-hub>=0.21,<0.25\naccelerate>=0.25,<0.28\n" > /tmp/constraints.txt && \
+    printf "torch>=2.1,<2.2\npydantic>=1.10,<2\ntransformers>=4.32,<4.35\nhuggingface-hub>=0.21,<0.25\naccelerate>=0.25,<0.28\nnumpy>=1.24,<2\n" > /tmp/constraints.txt && \
     pip install --no-cache-dir -c /tmp/constraints.txt "torch>=2.1,<2.2" grpcio-tools && \
     pip install --no-cache-dir "setuptools<70" && \
     pip install --no-cache-dir --no-build-isolation -c /tmp/constraints.txt hivemind==1.1.10.post2 && \
