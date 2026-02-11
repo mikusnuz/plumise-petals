@@ -1,6 +1,6 @@
 """Configuration management for Plumise Petals.
 
-Loads settings from environment variables and/or .env file using pydantic-settings.
+Loads settings from environment variables and/or .env file using pydantic BaseSettings.
 """
 
 from __future__ import annotations
@@ -9,8 +9,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseSettings, Field, validator
 
 
 # Contract ABI paths (relative to project root)
@@ -26,12 +25,10 @@ class PlumiseConfig(BaseSettings):
     3. .env file
     """
 
-    model_config = SettingsConfigDict(
-        env_prefix="",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        extra = "ignore"
 
     # -- Plumise Chain --
     plumise_rpc_url: str = Field(
@@ -102,7 +99,7 @@ class PlumiseConfig(BaseSettings):
         description="Minimum pending reward (in wei) to trigger auto-claim",
     )
 
-    @field_validator("plumise_private_key")
+    @validator("plumise_private_key")
     @classmethod
     def _normalize_private_key(cls, v: str) -> str:
         if not v:

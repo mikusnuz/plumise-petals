@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir --upgrade pip wheel && \
     pip install --no-cache-dir --no-build-isolation -c /tmp/constraints.txt hivemind==1.1.10.post2 && \
     pip install --no-cache-dir -c /tmp/constraints.txt "transformers>=4.32,<4.35" accelerate huggingface-hub \
         safetensors tokenizers sentencepiece bitsandbytes \
-        web3 eth-account aiohttp click python-dotenv pydantic pydantic-settings && \
+        web3 eth-account aiohttp click python-dotenv "pydantic>=1.10,<2" && \
     pip install --no-cache-dir --no-deps petals && \
     pip install --no-cache-dir --no-deps -e .
 
