@@ -15,6 +15,7 @@ import signal
 import threading
 from typing import Optional
 
+from plumise_petals.chain.agent import ChainAgent
 from plumise_petals.chain.auth import PlumiseAuth
 from plumise_petals.chain.config import PlumiseConfig
 from plumise_petals.chain.reporter import OracleReporter
@@ -43,6 +44,11 @@ class PlumiseServer:
 
         # Chain components
         self.auth = PlumiseAuth(config)
+        self.agent = ChainAgent(
+            config=config,
+            w3=self.auth.w3,
+            account=self.auth.account,
+        )
         self.reporter = OracleReporter(
             auth=self.auth,
             oracle_url=config.oracle_api_url,
@@ -94,18 +100,25 @@ class PlumiseServer:
         # Step 2: Start Petals server
         self._start_petals_server()
 
-        # Step 3: Start reporter
+        # Step 3: Register agent on-chain (if not already registered)
+        await self._register_agent()
+
+        # Step 4: Start reporter
         self._running = True
         await self.reporter.start(self.metrics)
 
-        # Step 4: Periodic reward check
+        # Step 5: Start heartbeat loop
+        heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+
+        # Step 6: Periodic reward check
         reward_task = asyncio.create_task(self._reward_check_loop())
 
-        # Step 5: Wait for shutdown
+        # Step 7: Wait for shutdown
         logger.info("Server is running. Press Ctrl+C to stop.")
         try:
             await self._shutdown_event.wait()
         finally:
+            heartbeat_task.cancel()
             reward_task.cancel()
             await self._shutdown()
 
@@ -122,20 +135,51 @@ class PlumiseServer:
                 self.config.plumise_rpc_url,
             )
 
-        # Check registration
-        if self.auth.verify_registration():
-            logger.info("Agent registration verified")
-        else:
-            logger.warning(
-                "Agent %s is NOT registered; metrics reporting may be rejected",
-                self.auth.address,
-            )
+        # Check registration (if AgentRegistry is deployed)
+        if self.config.agent_registry_address:
+            if self.auth.verify_registration():
+                logger.info("Agent registration verified (AgentRegistry)")
+            else:
+                logger.warning(
+                    "Agent %s is NOT registered in AgentRegistry; "
+                    "will attempt precompile registration",
+                    self.auth.address,
+                )
 
-        # Check active status
-        if self.auth.is_active():
-            logger.info("Agent is ACTIVE")
+            # Check active status
+            if self.auth.is_active():
+                logger.info("Agent is ACTIVE")
+            else:
+                logger.warning("Agent is not in Active status")
         else:
-            logger.warning("Agent is not in Active status")
+            logger.info("AgentRegistry not deployed yet; using precompile-only mode")
+
+    async def _register_agent(self) -> None:
+        """Register agent via precompile 0x21."""
+        if self.agent.is_registered:
+            logger.info("Agent already registered")
+            return
+
+        # Generate agent name from model + address suffix
+        agent_name = f"{self.config.model_name.split('/')[-1][:16]}-{self.auth.address[-8:]}"
+
+        logger.info("Registering agent on-chain: %s", agent_name)
+
+        # Run registration in thread pool (sync Web3 call)
+        loop = asyncio.get_event_loop()
+        success = await loop.run_in_executor(
+            None,
+            lambda: self.agent.register(
+                name=agent_name,
+                model_hash=b"\x00" * 32,
+                capabilities=[],
+            ),
+        )
+
+        if success:
+            logger.info("Agent registration complete")
+        else:
+            logger.warning("Agent registration failed; will retry on next start")
 
     def _start_petals_server(self) -> None:
         """Start the Petals model server in a background thread.
@@ -177,6 +221,27 @@ class PlumiseServer:
         )
         self._petals_thread.start()
         logger.info("Petals server thread started")
+
+    async def _heartbeat_loop(self) -> None:
+        """Periodically send heartbeat to chain."""
+        # Heartbeat every 5 minutes
+        interval = 300
+        while self._running:
+            try:
+                await asyncio.sleep(interval)
+
+                # Run heartbeat in thread pool (sync Web3 call)
+                loop = asyncio.get_event_loop()
+                success = await loop.run_in_executor(None, self.agent.heartbeat)
+
+                if success:
+                    logger.debug("Heartbeat sent successfully")
+                else:
+                    logger.warning("Heartbeat failed")
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                logger.exception("Error in heartbeat loop")
 
     async def _reward_check_loop(self) -> None:
         """Periodically check and claim rewards."""

@@ -29,9 +29,11 @@ Plumise 체인 기반 분산 LLM 추론 -- [Petals](https://github.com/bigscienc
 
 ## 주요 기능
 
-- **체인 인증** -- 에이전트가 이더리움 프라이빗 키로 메시지를 서명하여 신원을 증명하고, 온체인 AgentRegistry에서 등록 여부를 검증합니다.
+- **체인 인증** -- 에이전트가 이더리움 프라이빗 키로 메시지를 서명하여 신원을 증명하고 등록 여부를 검증합니다.
+- **온체인 등록** -- 첫 시작 시 프리컴파일 컨트랙트(0x21)를 통해 에이전트를 자동 등록합니다.
+- **하트비트 시스템** -- 주기적으로 하트비트 핑(프리컴파일 0x22)을 전송하여 에이전트 활성 상태를 유지합니다(5분마다).
 - **메트릭 수집** -- Petals 서버 파이프라인에서 추론 메트릭(처리된 토큰, 레이턴시, 업타임)을 스레드 안전하게 수집합니다.
-- **Oracle 보고** -- 서명된 메트릭 리포트를 주기적으로 Plumise Oracle API에 전송합니다.
+- **Oracle 보고** -- 서명된 메트릭 리포트를 주기적으로 Plumise Oracle API에 전송합니다(60초마다).
 - **보상 추적** -- RewardPool 컨트랙트에서 대기 중인 보상을 모니터링하고, 임계값에 도달하면 자동으로 클레임합니다.
 - **CLI 인터페이스** -- 서버 시작 및 상태 확인을 위한 간단한 커맨드라인 인터페이스를 제공합니다.
 
@@ -84,12 +86,15 @@ cp .env.example .env
 | `PLUMISE_RPC_URL` | `http://localhost:26902` | Plumise 체인 RPC 엔드포인트 |
 | `PLUMISE_CHAIN_ID` | `41956` | Plumise 체인 ID |
 | `PLUMISE_PRIVATE_KEY` | -- | 에이전트 지갑 프라이빗 키 (hex) |
+| `AGENT_REGISTRY_ADDRESS` | -- | AgentRegistry 컨트랙트 주소 (선택) |
+| `REWARD_POOL_ADDRESS` | -- | RewardPool 컨트랙트 주소 (선택) |
 | `ORACLE_API_URL` | `http://localhost:3100` | Oracle API 기본 URL |
 | `REPORT_INTERVAL` | `60` | 메트릭 보고 주기 (초) |
 | `MODEL_NAME` | `bigscience/bloom-560m` | 서빙할 HuggingFace 모델 (모델 티어 참조) |
 | `NUM_BLOCKS` | `2` | 서빙할 트랜스포머 블록 수 (많을수록 보상 증가) |
 | `PETALS_HOST` | `0.0.0.0` | 서버 리슨 주소 |
 | `PETALS_PORT` | `31330` | 서버 리슨 포트 |
+| `CLAIM_THRESHOLD_WEI` | `1000000000000000000` | 자동 클레임 임계값 (1 PLM) |
 
 ## 사용법
 
@@ -163,6 +168,7 @@ Uptime:          86400s
 plumise-petals/
 ├── src/plumise_petals/
 │   ├── chain/            # Plumise 체인 통합
+│   │   ├── agent.py      # 온체인 에이전트 등록 및 하트비트
 │   │   ├── auth.py       # 에이전트 인증
 │   │   ├── config.py     # 설정 관리
 │   │   ├── reporter.py   # Oracle 메트릭 리포터
@@ -186,15 +192,24 @@ pytest tests/ -v
 
 ## 스마트 컨트랙트
 
-시스템은 두 개의 온체인 컨트랙트와 상호작용합니다:
+시스템은 에이전트 라이프사이클 관리를 위해 **프리컴파일 컨트랙트**를 사용합니다:
 
-### AgentRegistry
+### 프리컴파일 0x21 (에이전트 등록)
+- 첫 시작 시 자동 호출
+- 입력: 에이전트 이름(32B) + 모델 해시(32B) + 능력
+- 메타데이터와 함께 에이전트 주소를 온체인에 등록
+
+### 프리컴파일 0x22 (하트비트)
+- 5분마다 자동 호출
+- 입력 불필요 (`msg.sender` 사용)
+- 에이전트의 마지막 활성 타임스탬프 업데이트
+
+### AgentRegistry (선택, 제네시스 이후 배포)
 - `isRegistered(address)` -- 에이전트 등록 여부 확인
 - `isActive(address)` -- 에이전트 활성 상태 확인
 - `getAgent(address)` -- 전체 에이전트 레코드 조회
-- `register(name, metadata)` -- 새 에이전트 등록
 
-### RewardPool
+### RewardPool (선택, 제네시스 이후 배포)
 - `getPendingReward(address)` -- 미청구 보상 조회
 - `claimReward()` -- 누적된 보상 클레임
 - `getContribution(address)` -- 기여 메트릭 조회
