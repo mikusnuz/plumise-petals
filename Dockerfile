@@ -11,7 +11,7 @@ COPY requirements.txt pyproject.toml setup.py ./
 COPY src/ ./src/
 COPY contracts/ ./contracts/
 
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+RUN pip install --no-cache-dir --upgrade pip "setuptools<70" wheel && \
     pip install --no-cache-dir --no-build-isolation hivemind==1.1.10.post2 && \
     pip install --no-cache-dir torch transformers accelerate huggingface-hub \
         safetensors tokenizers sentencepiece bitsandbytes \
