@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY requirements.txt pyproject.toml setup.py ./
 COPY src/ ./src/
+COPY contracts/ ./contracts/
 
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir torch transformers hivemind accelerate huggingface-hub \
