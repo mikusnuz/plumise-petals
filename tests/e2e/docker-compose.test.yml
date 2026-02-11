@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  # Mock Oracle API server
+  mock-oracle:
+    image: python:3.11-slim
+    container_name: plumise-mock-oracle
+    command: >
+      sh -c "
+      pip install fastapi uvicorn pydantic &&
+      python -c '
+      from fastapi import FastAPI, HTTPException
+      from pydantic import BaseModel
+      import uvicorn
+      from typing import Dict, Any
+
+      app = FastAPI()
+
+      class ReportPayload(BaseModel):
+          payload: Dict[str, Any]
+          signature: str
+
+      @app.post(\"/api/v1/report\")
+      async def receive_report(report: ReportPayload):
+          print(f\"Received report from agent: {report.payload.get(\"agent\")}\")
+          print(f\"Processed tokens: {report.payload.get(\"processed_tokens\")}\")
+          print(f\"Tasks completed: {report.payload.get(\"tasks_completed\")}\")
+          return {\"status\": \"success\", \"message\": \"Report received\"}
+
+      @app.get(\"/health\")
+      async def health():
+          return {\"status\": \"ok\"}
+
+      uvicorn.run(app, host=\"0.0.0.0\", port=3100)
+      '
+      "
+    ports:
+      - "3100:3100"
+    networks:
+      - petals-test-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3100/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Petals Node A - blocks 0-11
+  petals-node-a:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: plumise-petals-node-a
+    environment:
+      - PLUMISE_PRIVATE_KEY=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - PLUMISE_RPC_URL=http://localhost:26902
+      - PLUMISE_CHAIN_ID=41956
+      - ORACLE_API_URL=http://mock-oracle:3100
+      - MODEL_NAME=bigscience/bloom-560m
+      - NUM_BLOCKS=12
+      - PETALS_HOST=0.0.0.0
+      - PETALS_PORT=31330
+      - REPORT_INTERVAL=30
+    ports:
+      - "31330:31330"
+    networks:
+      - petals-test-net
+    depends_on:
+      mock-oracle:
+        condition: service_healthy
+    volumes:
+      - petals-cache-a:/root/.cache
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  # Petals Node B - blocks 12-23
+  petals-node-b:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: plumise-petals-node-b
+    environment:
+      - PLUMISE_PRIVATE_KEY=0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      - PLUMISE_RPC_URL=http://localhost:26902
+      - PLUMISE_CHAIN_ID=41956
+      - ORACLE_API_URL=http://mock-oracle:3100
+      - MODEL_NAME=bigscience/bloom-560m
+      - NUM_BLOCKS=12
+      - PETALS_HOST=0.0.0.0
+      - PETALS_PORT=31331
+      - REPORT_INTERVAL=30
+    ports:
+      - "31331:31331"
+    networks:
+      - petals-test-net
+    depends_on:
+      mock-oracle:
+        condition: service_healthy
+    volumes:
+      - petals-cache-b:/root/.cache
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+networks:
+  petals-test-net:
+    driver: bridge
+
+volumes:
+  petals-cache-a:
+  petals-cache-b:
