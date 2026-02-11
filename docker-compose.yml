@@ -12,6 +12,7 @@ services:
       - .env
     volumes:
       - ./model-cache:/root/.cache/huggingface
+      - ./data:/data
     environment:
       - HF_HOME=/root/.cache/huggingface
       - PYTHONUNBUFFERED=1

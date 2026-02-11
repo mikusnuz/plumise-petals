@@ -13,6 +13,7 @@ import asyncio
 import logging
 import signal
 import threading
+from pathlib import Path
 from typing import Optional
 
 from plumise_petals.chain.agent import ChainAgent
@@ -214,6 +215,11 @@ class PlumiseServer:
                 )
                 # Build extra kwargs for DHT
                 dht_kwargs = {}
+                if self.config.petals_identity_path:
+                    # Persist P2P identity so peer ID survives restarts
+                    identity_dir = Path(self.config.petals_identity_path).parent
+                    identity_dir.mkdir(parents=True, exist_ok=True)
+                    dht_kwargs["identity_path"] = self.config.petals_identity_path
                 if self.config.petals_announce_ip:
                     # Listen on all interfaces and announce the specified IP
                     dht_kwargs["host_maddrs"] = [

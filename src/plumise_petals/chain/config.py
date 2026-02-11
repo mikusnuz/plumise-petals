@@ -103,6 +103,10 @@ class PlumiseConfig(BaseSettings):
         default="",
         description="Public IP to announce in DHT (empty = auto-detect)",
     )
+    petals_identity_path: str = Field(
+        default="/data/identity.key",
+        description="Path to persist P2P identity key (fixes peer ID across restarts)",
+    )
 
     # -- Inference proof --
     verify_on_chain: bool = Field(
