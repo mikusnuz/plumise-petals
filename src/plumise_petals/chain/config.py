@@ -86,6 +86,20 @@ class PlumiseConfig(BaseSettings):
         description="Petals server listen port",
     )
 
+    # -- Petals DHT --
+    petals_initial_peers: str = Field(
+        default="",
+        description="Comma-separated initial DHT peer multiaddrs",
+    )
+    petals_dht_prefix: str = Field(
+        default="plumise",
+        description="DHT prefix for model routing",
+    )
+    petals_throughput: str = Field(
+        default="auto",
+        description="Server throughput setting (auto or float)",
+    )
+
     # -- Inference proof --
     verify_on_chain: bool = Field(
         default=False,

@@ -199,18 +199,26 @@ class PlumiseServer:
             try:
                 from petals.server.server import Server as PetalsServer  # type: ignore
 
+                initial_peers = [
+                    p.strip()
+                    for p in self.config.petals_initial_peers.split(",")
+                    if p.strip()
+                ]
+
                 logger.info(
-                    "Starting Petals server: model=%s blocks=%d host=%s port=%d",
+                    "Starting Petals server: model=%s blocks=%d dht_prefix=%s peers=%s",
                     self.config.model_name,
                     self.config.num_blocks,
-                    self.config.petals_host,
-                    self.config.petals_port,
+                    self.config.petals_dht_prefix,
+                    initial_peers or "(bootstrap)",
                 )
                 server = PetalsServer(
-                    model_name_or_path=self.config.model_name,
+                    initial_peers=initial_peers,
+                    dht_prefix=self.config.petals_dht_prefix,
+                    converted_model_name_or_path=self.config.model_name,
+                    throughput=self.config.petals_throughput,
                     num_blocks=self.config.num_blocks,
-                    host=self.config.petals_host,
-                    port=self.config.petals_port,
+                    skip_reachability_check=True,
                 )
                 server.run()
             except ImportError:
