@@ -11,7 +11,9 @@ COPY requirements.txt pyproject.toml setup.py ./
 COPY src/ ./src/
 
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e .
+    pip install --no-cache-dir petals>=2.2.0 --no-deps && \
+    pip install --no-cache-dir -e . && \
+    pip install --no-cache-dir torch transformers hivemind accelerate huggingface-hub safetensors tokenizers sentencepiece bitsandbytes
 
 FROM python:3.10-slim
 
