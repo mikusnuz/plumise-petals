@@ -133,13 +133,13 @@ class OracleReporter:
         }
         signature = self.auth.sign_payload(sign_data)
 
-        # Build flat body matching Oracle's ReportMetricsDto
+        # Build flat body matching Oracle's ReportMetricsDto property names
         body: dict = {
-            "agent": self.auth.address,
-            "processed_tokens": metrics.total_tokens_processed,
-            "avg_latency_ms": round(metrics.avg_latency_ms, 2),
-            "uptime_seconds": metrics.uptime_seconds,
-            "tasks_completed": metrics.total_requests,
+            "wallet": self.auth.address,
+            "tokensProcessed": metrics.total_tokens_processed,
+            "avgLatencyMs": round(metrics.avg_latency_ms, 2),
+            "uptimeSeconds": metrics.uptime_seconds,
+            "requestCount": metrics.total_requests,
             "timestamp": ts,
             "signature": signature,
         }
@@ -176,8 +176,8 @@ class OracleReporter:
 
                         logger.debug(
                             "Report sent successfully: tokens=%d uptime=%ds",
-                            body["processed_tokens"],
-                            body["uptime_seconds"],
+                            body["tokensProcessed"],
+                            body["uptimeSeconds"],
                         )
                         return True
                     else:
