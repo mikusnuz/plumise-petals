@@ -58,10 +58,9 @@ class GenerateResponse(BaseModel):
 class InferenceEngine:
     """Wraps Petals distributed model for HTTP-based inference."""
 
-    def __init__(self, model_name: str, dht_prefix: str, dht=None, initial_peers: Optional[list[str]] = None) -> None:
+    def __init__(self, model_name: str, dht_prefix: str, initial_peers: Optional[list[str]] = None) -> None:
         self.model_name = model_name
         self.dht_prefix = dht_prefix
-        self.dht = dht
         self.initial_peers = initial_peers or []
         self.model = None
         self.tokenizer = None
@@ -79,22 +78,14 @@ class InferenceEngine:
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
 
-            kwargs = {"dht_prefix": self.dht_prefix}
-            if self.dht is not None:
-                logger.info(
-                    "Loading distributed model: %s (shared DHT, prefix=%s)",
-                    self.model_name, self.dht_prefix,
-                )
-                kwargs["dht"] = self.dht
-            else:
-                logger.info(
-                    "Loading distributed model: %s (peers=%s, prefix=%s)",
-                    self.model_name, self.initial_peers or "(bootstrap)", self.dht_prefix,
-                )
-                kwargs["initial_peers"] = self.initial_peers
-
+            logger.info(
+                "Loading distributed model: %s (peers=%s, prefix=%s)",
+                self.model_name, self.initial_peers or "(bootstrap)", self.dht_prefix,
+            )
             self.model = AutoDistributedModelForCausalLM.from_pretrained(
-                self.model_name, **kwargs,
+                self.model_name,
+                initial_peers=self.initial_peers,
+                dht_prefix=self.dht_prefix,
             )
             self.model.eval()
             self.ready = True
@@ -136,7 +127,6 @@ class InferenceEngine:
 def create_app(
     plumise_server: Optional["PlumiseServer"] = None,
     model_name: str = "bigscience/bloom-560m",
-    dht=None,
     initial_peers: Optional[list[str]] = None,
     dht_prefix: str = "plumise",
 ) -> FastAPI:
@@ -145,12 +135,11 @@ def create_app(
     Args:
         plumise_server: If provided, inference metrics are recorded.
         model_name: HuggingFace model name.
-        dht: Shared DHT instance from the Petals server (preferred).
-        initial_peers: DHT bootstrap peers (fallback if dht not provided).
+        initial_peers: DHT bootstrap peers (local Petals server address).
         dht_prefix: DHT namespace prefix.
     """
     app = FastAPI(title="Plumise Petals API", version="0.1.0")
-    engine = InferenceEngine(model_name, dht_prefix, dht=dht, initial_peers=initial_peers or [])
+    engine = InferenceEngine(model_name, dht_prefix, initial_peers=initial_peers or [])
 
     # Load model in background thread (don't block startup)
     load_thread = threading.Thread(target=engine.load, name="model-loader", daemon=True)

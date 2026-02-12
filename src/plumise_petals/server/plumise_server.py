@@ -276,22 +276,31 @@ class PlumiseServer:
         def _run_api() -> None:
             from plumise_petals.api.server import create_app, run_api_server
 
-            # Wait for Petals server DHT (non-blocking for main async loop)
-            logger.info("API thread waiting for Petals server DHT...")
+            # Wait for Petals server to be ready so we can get its peer address
+            logger.info("API thread waiting for Petals server...")
             if not self._petals_ready.wait(timeout=300):
                 logger.error("Petals server did not start in 300s; skipping API server")
                 return
 
-            dht = getattr(self._petals_server, "dht", None)
-            if dht is None:
-                logger.error("Petals server has no DHT; skipping API server")
+            # Get the local Petals server's multiaddrs as initial_peers
+            local_peers = []
+            try:
+                dht = getattr(self._petals_server, "dht", None)
+                if dht is not None:
+                    visible = dht.get_visible_maddrs()
+                    local_peers = [str(addr) for addr in visible]
+                    logger.info("Local Petals DHT peers: %s", local_peers)
+            except Exception:
+                logger.exception("Failed to get Petals DHT addresses")
+
+            if not local_peers:
+                logger.error("No local DHT peers found; skipping API server")
                 return
 
-            logger.info("Sharing Petals DHT with API server")
             app = create_app(
                 plumise_server=self,
                 model_name=self.config.model_name,
-                dht=dht,
+                initial_peers=local_peers,
                 dht_prefix=self.config.petals_dht_prefix,
             )
             run_api_server(app, "0.0.0.0", self.config.api_port)
