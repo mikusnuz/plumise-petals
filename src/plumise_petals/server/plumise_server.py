@@ -76,6 +76,8 @@ class PlumiseServer:
         self._shutdown_event = asyncio.Event()
         self._petals_thread: Optional[threading.Thread] = None
         self._api_thread: Optional[threading.Thread] = None
+        self._petals_server = None
+        self._petals_ready = threading.Event()
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -243,6 +245,9 @@ class PlumiseServer:
                     skip_reachability_check=True,
                     **dht_kwargs,
                 )
+                # Share DHT with API server before blocking run()
+                self._petals_server = server
+                self._petals_ready.set()
                 server.run()
             except ImportError:
                 logger.error(
@@ -266,30 +271,38 @@ class PlumiseServer:
 
         The API provides /health and /api/v1/generate endpoints that
         the plumise-inference-api can call to perform text generation.
+        The thread waits for the Petals DHT to be ready before loading.
         """
-        from plumise_petals.api.server import create_app, run_api_server
+        def _run_api() -> None:
+            from plumise_petals.api.server import create_app, run_api_server
 
-        initial_peers = [
-            p.strip()
-            for p in self.config.petals_initial_peers.split(",")
-            if p.strip()
-        ]
+            # Wait for Petals server DHT (non-blocking for main async loop)
+            logger.info("API thread waiting for Petals server DHT...")
+            if not self._petals_ready.wait(timeout=300):
+                logger.error("Petals server did not start in 300s; skipping API server")
+                return
 
-        app = create_app(
-            plumise_server=self,
-            model_name=self.config.model_name,
-            initial_peers=initial_peers,
-            dht_prefix=self.config.petals_dht_prefix,
-        )
+            dht = getattr(self._petals_server, "dht", None)
+            if dht is None:
+                logger.error("Petals server has no DHT; skipping API server")
+                return
+
+            logger.info("Sharing Petals DHT with API server")
+            app = create_app(
+                plumise_server=self,
+                model_name=self.config.model_name,
+                dht=dht,
+                dht_prefix=self.config.petals_dht_prefix,
+            )
+            run_api_server(app, "0.0.0.0", self.config.api_port)
 
         self._api_thread = threading.Thread(
-            target=run_api_server,
-            args=(app, "0.0.0.0", self.config.api_port),
+            target=_run_api,
             name="api-server",
             daemon=True,
         )
         self._api_thread.start()
-        logger.info("API server thread started on port %d", self.config.api_port)
+        logger.info("API server thread started (waiting for DHT on port %d)", self.config.api_port)
 
     async def _heartbeat_loop(self) -> None:
         """Periodically send heartbeat to chain."""
