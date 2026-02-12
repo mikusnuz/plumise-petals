@@ -18,7 +18,8 @@ RUN pip install --no-cache-dir --upgrade pip wheel && \
     pip install --no-cache-dir --no-build-isolation -c /tmp/constraints.txt hivemind==1.1.10.post2 && \
     pip install --no-cache-dir -c /tmp/constraints.txt "transformers>=4.32,<4.35" "accelerate>=0.25,<0.28" "huggingface-hub>=0.21,<0.25" \
         safetensors tokenizers sentencepiece bitsandbytes \
-        web3 eth-account aiohttp click python-dotenv "pydantic>=1.10,<2" && \
+        web3 eth-account aiohttp click python-dotenv "pydantic>=1.10,<2" \
+        fastapi uvicorn && \
     pip install --no-cache-dir -c /tmp/constraints.txt petals && \
     pip install --no-cache-dir --no-deps -e .
 
@@ -39,8 +40,8 @@ ENV HF_HOME=/root/.cache/huggingface
 
 VOLUME ["/root/.cache/huggingface"]
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:${PETALS_PORT:-31330}/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD curl -f http://localhost:${API_PORT:-31331}/health || exit 1
 
 ENTRYPOINT ["plumise-petals"]
 CMD ["serve"]

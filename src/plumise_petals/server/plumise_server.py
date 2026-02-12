@@ -75,6 +75,7 @@ class PlumiseServer:
         self._running = False
         self._shutdown_event = asyncio.Event()
         self._petals_thread: Optional[threading.Thread] = None
+        self._api_thread: Optional[threading.Thread] = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -101,6 +102,7 @@ class PlumiseServer:
         logger.info("  Chain: %s (ID %d)", self.config.plumise_rpc_url, self.config.plumise_chain_id)
         logger.info("  Oracle: %s", self.config.oracle_api_url)
         logger.info("  On-chain verify: %s", "ON" if self.config.verify_on_chain else "OFF")
+        logger.info("  API port: %d", self.config.api_port)
         logger.info("=" * 60)
 
         # Step 1: Chain checks
@@ -109,17 +111,20 @@ class PlumiseServer:
         # Step 2: Start Petals server
         self._start_petals_server()
 
-        # Step 3: Register agent on-chain (if not already registered)
+        # Step 3: Start HTTP API server
+        self._start_api_server()
+
+        # Step 4: Register agent on-chain (if not already registered)
         await self._register_agent()
 
-        # Step 4: Start reporter
+        # Step 5: Start reporter
         self._running = True
         await self.reporter.start(self.metrics)
 
-        # Step 5: Start heartbeat loop
+        # Step 6: Start heartbeat loop
         heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
-        # Step 6: Periodic reward check
+        # Step 7: Periodic reward check
         reward_task = asyncio.create_task(self._reward_check_loop())
 
         # Step 7: Wait for shutdown
@@ -255,6 +260,36 @@ class PlumiseServer:
         )
         self._petals_thread.start()
         logger.info("Petals server thread started")
+
+    def _start_api_server(self) -> None:
+        """Start the HTTP API server in a background thread.
+
+        The API provides /health and /api/v1/generate endpoints that
+        the plumise-inference-api can call to perform text generation.
+        """
+        from plumise_petals.api.server import create_app, run_api_server
+
+        initial_peers = [
+            p.strip()
+            for p in self.config.petals_initial_peers.split(",")
+            if p.strip()
+        ]
+
+        app = create_app(
+            plumise_server=self,
+            model_name=self.config.model_name,
+            initial_peers=initial_peers,
+            dht_prefix=self.config.petals_dht_prefix,
+        )
+
+        self._api_thread = threading.Thread(
+            target=run_api_server,
+            args=(app, "0.0.0.0", self.config.api_port),
+            name="api-server",
+            daemon=True,
+        )
+        self._api_thread.start()
+        logger.info("API server thread started on port %d", self.config.api_port)
 
     async def _heartbeat_loop(self) -> None:
         """Periodically send heartbeat to chain."""

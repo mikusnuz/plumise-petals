@@ -108,6 +108,14 @@ class PlumiseConfig(BaseSettings):
         description="Path to persist P2P identity key (fixes peer ID across restarts)",
     )
 
+    # -- HTTP API --
+    api_port: int = Field(
+        default=31331,
+        ge=1,
+        le=65535,
+        description="HTTP API server port for inference requests",
+    )
+
     # -- Inference proof --
     verify_on_chain: bool = Field(
         default=False,
