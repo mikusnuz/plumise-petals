@@ -39,6 +39,7 @@ class GenerateParams(BaseModel):
     max_new_tokens: int = PydanticField(default=128, ge=1, le=4096)
     temperature: float = PydanticField(default=0.7, ge=0.0, le=2.0)
     top_p: float = PydanticField(default=0.9, ge=0.0, le=1.0)
+    repetition_penalty: float = PydanticField(default=1.2, ge=1.0, le=2.0)
     do_sample: bool = True
 
 
@@ -95,6 +96,7 @@ class InferenceEngine:
 
     def generate(self, prompt: str, max_new_tokens: int = 128,
                  temperature: float = 0.7, top_p: float = 0.9,
+                 repetition_penalty: float = 1.2,
                  do_sample: bool = True) -> tuple[str, int]:
         """Generate text from prompt. Returns (generated_text, num_tokens)."""
         if not self.ready:
@@ -110,6 +112,7 @@ class InferenceEngine:
                     max_new_tokens=max_new_tokens,
                     temperature=max(temperature, 0.01),
                     top_p=top_p,
+                    repetition_penalty=repetition_penalty,
                     do_sample=do_sample,
                 )
 
@@ -168,6 +171,7 @@ def create_app(
                     max_new_tokens=params.max_new_tokens,
                     temperature=params.temperature,
                     top_p=params.top_p,
+                    repetition_penalty=params.repetition_penalty,
                     do_sample=params.do_sample,
                 ),
             )
