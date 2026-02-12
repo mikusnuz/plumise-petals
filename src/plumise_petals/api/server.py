@@ -56,7 +56,12 @@ class GenerateResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 class InferenceEngine:
-    """Wraps Petals distributed model for HTTP-based inference."""
+    """Wraps a local HuggingFace model for HTTP-based inference.
+
+    Uses transformers AutoModelForCausalLM for direct local inference,
+    bypassing Petals DHT/RPC which has known hivemind streaming bugs.
+    The Petals server still runs separately for DHT block announcements.
+    """
 
     def __init__(self, model_name: str, dht_prefix: str, initial_peers: Optional[list[str]] = None) -> None:
         self.model_name = model_name
@@ -68,28 +73,23 @@ class InferenceEngine:
         self._lock = threading.Lock()
 
     def load(self) -> None:
-        """Load model and tokenizer. Called in a background thread."""
+        """Load model and tokenizer locally. Called in a background thread."""
         try:
-            from petals import AutoDistributedModelForCausalLM  # type: ignore
-            from transformers import AutoTokenizer
+            from transformers import AutoTokenizer, AutoModelForCausalLM
 
             logger.info("Loading tokenizer: %s", self.model_name)
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
 
-            logger.info(
-                "Loading distributed model: %s (peers=%s, prefix=%s)",
-                self.model_name, self.initial_peers or "(bootstrap)", self.dht_prefix,
-            )
-            self.model = AutoDistributedModelForCausalLM.from_pretrained(
+            logger.info("Loading local model: %s", self.model_name)
+            self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
-                initial_peers=self.initial_peers,
-                dht_prefix=self.dht_prefix,
+                torch_dtype=torch.bfloat16,
             )
             self.model.eval()
             self.ready = True
-            logger.info("Inference engine ready")
+            logger.info("Inference engine ready (local mode)")
         except Exception:
             logger.exception("Failed to load inference engine")
 
