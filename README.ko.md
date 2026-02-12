@@ -1,5 +1,9 @@
 # Plumise Petals
 
+> **⚠️ DEPRECATED**: 이 프로젝트는 [plumise-agent](https://github.com/mikusnuz/plumise-agent)로 대체되었습니다.
+> plumise-agent는 Petals/hivemind 의존성 없이 동일한 기능을 제공하며, gRPC 파이프라인 병렬처리를 통한 자체 분산 추론을 지원합니다.
+> 이 저장소는 아카이브되었으며 더 이상 업데이트되지 않습니다.
+
 **[English](README.md) | [한국어](README.ko.md)**
 
 Plumise 네트워크의 AI 추론 노드. GPU(또는 CPU)를 제공하고 PLM 토큰을 채굴하세요.

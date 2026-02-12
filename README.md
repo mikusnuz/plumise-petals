@@ -1,5 +1,9 @@
 # Plumise Petals
 
+> **⚠️ DEPRECATED**: This project has been replaced by [plumise-agent](https://github.com/mikusnuz/plumise-agent).
+> plumise-agent provides the same functionality without the Petals/hivemind dependency, with custom distributed inference via gRPC pipeline parallelism.
+> This repository is archived and will not receive further updates.
+
 **[English](README.md) | [한국어](README.ko.md)**
 
 AI inference node for the Plumise network. Provide your GPU (or CPU) and mine PLM tokens.
