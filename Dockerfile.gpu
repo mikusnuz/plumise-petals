@@ -1,0 +1,58 @@
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 python3.10-dev python3.10-venv python3-pip \
+    build-essential git curl \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python \
+    && python3 -m pip install --no-cache-dir --upgrade pip wheel \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt pyproject.toml setup.py ./
+COPY src/ ./src/
+COPY contracts/ ./contracts/
+
+RUN printf "torch>=2.1,<2.2\npydantic>=1.10,<2\ntransformers>=4.32,<4.35\nhuggingface-hub>=0.21,<0.25\naccelerate>=0.25,<0.28\nnumpy>=1.24,<2\n" > /tmp/constraints.txt && \
+    pip install --no-cache-dir -c /tmp/constraints.txt "torch>=2.1,<2.2" --index-url https://download.pytorch.org/whl/cu121 && \
+    pip install --no-cache-dir grpcio-tools && \
+    pip install --no-cache-dir "setuptools<70" && \
+    pip install --no-cache-dir --no-build-isolation -c /tmp/constraints.txt hivemind==1.1.10.post2 && \
+    pip install --no-cache-dir -c /tmp/constraints.txt "transformers>=4.32,<4.35" "accelerate>=0.25,<0.28" "huggingface-hub>=0.21,<0.25" \
+        safetensors tokenizers sentencepiece bitsandbytes \
+        web3 eth-account aiohttp click python-dotenv "pydantic>=1.10,<2" \
+        fastapi uvicorn && \
+    pip install --no-cache-dir -c /tmp/constraints.txt petals && \
+    pip install --no-cache-dir --no-deps -e .
+
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 python3-pip curl \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /app /app
+
+ENV PYTHONUNBUFFERED=1
+ENV HF_HOME=/root/.cache/huggingface
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+VOLUME ["/root/.cache/huggingface"]
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD curl -f http://localhost:${API_PORT:-31331}/health || exit 1
+
+ENTRYPOINT ["plumise-petals"]
+CMD ["serve"]

@@ -64,10 +64,11 @@ class InferenceEngine:
     The Petals server still runs separately for DHT block announcements.
     """
 
-    def __init__(self, model_name: str, dht_prefix: str, initial_peers: Optional[list[str]] = None) -> None:
+    def __init__(self, model_name: str, dht_prefix: str, initial_peers: Optional[list[str]] = None, device: str = "auto") -> None:
         self.model_name = model_name
         self.dht_prefix = dht_prefix
         self.initial_peers = initial_peers or []
+        self.device = device
         self.model = None
         self.tokenizer = None
         self.ready = False
@@ -78,19 +79,26 @@ class InferenceEngine:
         try:
             from transformers import AutoTokenizer, AutoModelForCausalLM
 
+            # Resolve device
+            if self.device == "auto":
+                self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+            dtype = torch.bfloat16 if self.device.startswith("cuda") else torch.float32
+
             logger.info("Loading tokenizer: %s", self.model_name)
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
 
-            logger.info("Loading local model: %s", self.model_name)
+            logger.info("Loading local model: %s (device=%s, dtype=%s)", self.model_name, self.device, dtype)
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
-                torch_dtype=torch.bfloat16,
+                torch_dtype=dtype,
             )
+            self.model = self.model.to(self.device)
             self.model.eval()
             self.ready = True
-            logger.info("Inference engine ready (local mode)")
+            logger.info("Inference engine ready (device=%s)", self.device)
         except Exception:
             logger.exception("Failed to load inference engine")
 
@@ -104,6 +112,7 @@ class InferenceEngine:
 
         with self._lock:
             inputs = self.tokenizer(prompt, return_tensors="pt")
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
             input_len = inputs["input_ids"].shape[1]
 
             with torch.no_grad():
@@ -132,6 +141,7 @@ def create_app(
     model_name: str = "bigscience/bloom-560m",
     initial_peers: Optional[list[str]] = None,
     dht_prefix: str = "plumise",
+    device: str = "auto",
 ) -> FastAPI:
     """Create the FastAPI application.
 
@@ -140,9 +150,10 @@ def create_app(
         model_name: HuggingFace model name.
         initial_peers: DHT bootstrap peers (local Petals server address).
         dht_prefix: DHT namespace prefix.
+        device: Device to run inference on (auto/cpu/cuda).
     """
     app = FastAPI(title="Plumise Petals API", version="0.1.0")
-    engine = InferenceEngine(model_name, dht_prefix, initial_peers=initial_peers or [])
+    engine = InferenceEngine(model_name, dht_prefix, initial_peers=initial_peers or [], device=device)
 
     # Load model in background thread (don't block startup)
     load_thread = threading.Thread(target=engine.load, name="model-loader", daemon=True)

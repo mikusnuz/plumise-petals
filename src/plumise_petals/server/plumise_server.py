@@ -103,6 +103,7 @@ class PlumiseServer:
         logger.info("  Blocks: %d", self.config.num_blocks)
         logger.info("  Chain: %s (ID %d)", self.config.plumise_rpc_url, self.config.plumise_chain_id)
         logger.info("  Oracle: %s", self.config.oracle_api_url)
+        logger.info("  Device: %s", self.config.device)
         logger.info("  On-chain verify: %s", "ON" if self.config.verify_on_chain else "OFF")
         logger.info("  API port: %d", self.config.api_port)
         logger.info("=" * 60)
@@ -302,6 +303,7 @@ class PlumiseServer:
                 model_name=self.config.model_name,
                 initial_peers=local_peers,
                 dht_prefix=self.config.petals_dht_prefix,
+                device=self.config.device,
             )
             run_api_server(app, "0.0.0.0", self.config.api_port)
 

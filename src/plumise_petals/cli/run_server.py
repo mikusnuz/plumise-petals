@@ -114,6 +114,12 @@ def cli() -> None:
     help="RewardPool contract address.",
 )
 @click.option(
+    "--device",
+    "device",
+    default=None,
+    help="Device: auto, cpu, cuda, cuda:0, etc.",
+)
+@click.option(
     "--env-file",
     "env_file",
     default=".env",
@@ -138,6 +144,7 @@ def serve(
     port: int | None,
     agent_registry: str | None,
     reward_pool: str | None,
+    device: str | None,
     env_file: str,
     verbose: bool,
 ) -> None:
@@ -176,6 +183,8 @@ def serve(
         overrides["agent_registry_address"] = agent_registry
     if reward_pool is not None:
         overrides["reward_pool_address"] = reward_pool
+    if device is not None:
+        overrides["device"] = device
 
     # Create config
     try:

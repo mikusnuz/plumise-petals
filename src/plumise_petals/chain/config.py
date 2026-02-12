@@ -108,6 +108,12 @@ class PlumiseConfig(BaseSettings):
         description="Path to persist P2P identity key (fixes peer ID across restarts)",
     )
 
+    # -- Device --
+    device: str = Field(
+        default="auto",
+        description="Device to use: auto, cpu, cuda, cuda:0, etc.",
+    )
+
     # -- HTTP API --
     api_port: int = Field(
         default=31331,
